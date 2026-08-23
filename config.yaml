@@ -1,0 +1,15 @@
+llm:
+  chat:
+    base_url: "https://api.deepseek.com"              # 例：https://api.deepseek.com
+    api_key_env: DEEPSEEK_API_KEY  # 从环境变量或 .env 读取的 key 名
+    model: "deepseek-v4-flash"                 # 例：deepseek-v4-flash / gpt-4o-mini
+    temperature: 0.8                            # 0-1，越高越有变化，越低越稳定
+  embedding:
+    base_url: "https://api.siliconflow.cn/v1"              # 例：https://api.siliconflow.cn/v1（OpenAI 兼容 embeddings 接口）
+    api_key_env: EMBEDDING_API_KEY # 缺省时回退使用 chat 的 api_key
+    model: "BAAI/bge-m3"                 # 例：BAAI/bge-m3 / text-embedding-3-small（留空则 RAG 仅用关键词过滤）
+
+questionnaire_dir: questionaire
+knowledge_dir: rag/knowledge
+index_path: rag/index.json
+index_npz: rag/index.npz
