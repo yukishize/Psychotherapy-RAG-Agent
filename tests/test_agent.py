@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
+from agent.memory import ConversationHistory
 from agent.prompts import build_system_prompt
 from agent.session import Session, profile_to_query, profile_summary_text, severity_from_level
 from qengine.models import AssessmentProfile, ScoreResult
@@ -124,3 +125,72 @@ def test_build_system_prompt_anti_mechanical_rules():
     assert "不要每轮都以提问结尾" in prompt
     assert "回复控制在 2-4 句" in prompt
     assert "开头不要总是情绪反射式" in prompt
+
+
+def test_conversation_history_trims():
+    history = ConversationHistory(max_messages=3)
+    history.add_user("u1")
+    history.add_assistant("a1")
+    history.add_user("u2")
+    history.add_assistant("a2")
+    history.add_user("u3")
+    assert len(history.messages) == 3
+    assert history.messages[0]["content"] == "u2"
+    assert [m["role"] for m in history.messages] == ["user", "assistant", "user"]
+
+
+def test_session_keeps_assistant_reply_in_history():
+    store = VectorStore()
+    profiles = [make_profile("phq9", "phq9_total", 6, "轻度抑郁")]
+    llm = FakeLLM()
+    session = Session(llm, store, None, profiles)
+
+    list(session.reply("我今天很难受"))
+
+    assert len(session.messages) == 2
+    assert session.messages[0] == {"role": "user", "content": "我今天很难受"}
+    assert session.messages[-1]["role"] == "assistant"
+    assert session.messages[-1]["content"] == "（模拟回复）"
+
+
+def test_session_passes_assistant_history_to_llm():
+    store = VectorStore()
+    profiles = [make_profile("phq9", "phq9_total", 6, "轻度抑郁")]
+    llm = FakeLLM()
+    session = Session(llm, store, None, profiles)
+
+    list(session.reply("第一句"))
+    list(session.reply("第二句"))
+
+    assert [m["role"] for m in llm.last_messages] == [
+        "system",
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert llm.last_messages[-2]["content"] == "（模拟回复）"
+    assert llm.last_messages[-1]["content"] == "第二句"
+
+
+def test_session_real_time_crisis_skips_treatment():
+    store = VectorStore()
+    store.add(Document(
+        id="t1",
+        category="treatment",
+        target="user",
+        tags=["depression"],
+        severity=["mild"],
+        title="方法",
+        text="正念呼吸练习",
+        embedding=np.ones(4, dtype="float32"),
+    ))
+    profiles = [make_profile("phq9", "phq9_total", 2, "无抑郁")]
+    llm = FakeLLM()
+    session = Session(llm, store, None, profiles)
+
+    list(session.reply("我想死"))
+
+    system = llm.last_messages[0]["content"]
+    assert "12356" in system
+    assert "不要推荐任何自愈方法" in system
+    assert "正念呼吸练习" not in system
