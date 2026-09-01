@@ -19,16 +19,38 @@ class Document:
 class VectorStore:
     def __init__(self):
         self.documents: List[Document] = []
+        self._embedding_matrix: Optional[np.ndarray] = None
+        self._normalized_matrix: Optional[np.ndarray] = None
 
     def add(self, doc: Document) -> None:
         self.documents.append(doc)
+        # 文档变化后使缓存失效，避免使用旧矩阵
+        self._embedding_matrix = None
+        self._normalized_matrix = None
 
     def embedding_matrix(self) -> Optional[np.ndarray]:
+        if self._embedding_matrix is not None:
+            return self._embedding_matrix
         if not self.documents:
             return None
         if any(d.embedding is None for d in self.documents):
             return None
-        return np.vstack([d.embedding for d in self.documents]).astype("float32")
+        self._embedding_matrix = np.vstack([d.embedding for d in self.documents]).astype("float32")
+        return self._embedding_matrix
+
+    def normalized_embedding_matrix(self) -> Optional[np.ndarray]:
+        """返回按行归一化后的向量矩阵，并缓存结果。
+
+        每轮检索会调用多次，归一化结果复用后可以省去重复的 np.linalg.norm。
+        """
+        if self._normalized_matrix is not None:
+            return self._normalized_matrix
+        mat = self.embedding_matrix()
+        if mat is None:
+            return None
+        norms = np.linalg.norm(mat, axis=-1, keepdims=True)
+        self._normalized_matrix = mat / np.clip(norms, 1e-9, None)
+        return self._normalized_matrix
 
     def save(self, index_path, npz_path) -> None:
         import json

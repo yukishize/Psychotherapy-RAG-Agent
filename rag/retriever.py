@@ -41,12 +41,12 @@ def search(
     if query_embedding is None:
         return [(store.documents[i], 0.0) for i in candidates[:top_k]]
 
-    matrix = store.embedding_matrix()
-    if matrix is None:
+    docs_mat = store.normalized_embedding_matrix()
+    if docs_mat is None:
         return [(store.documents[i], 0.0) for i in candidates[:top_k]]
 
     query = _normalize(query_embedding.reshape(1, -1))
-    docs_mat = _normalize(matrix[candidates])
+    docs_mat = docs_mat[candidates]
     scores = (docs_mat @ query.T).ravel()
 
     order = np.argsort(-scores)[:top_k]

@@ -10,7 +10,7 @@ class LLMClient:
         self._client = OpenAI(base_url=base_url or None, api_key=api_key)
 
     def chat(self, messages: List[dict], stream: bool = True) -> Union[Iterator[str], str]:
-        if stream:
+        if stream:#流式
             resp = self._client.chat.completions.create(
                 model=self.model, messages=messages, stream=True, temperature=self.temperature
             )
@@ -19,7 +19,7 @@ class LLMClient:
                     delta = chunk.choices[0].delta.content
                     if delta:
                         yield delta
-        else:
+        else:#非流式
             resp = self._client.chat.completions.create(
                 model=self.model, messages=messages, stream=False, temperature=self.temperature
             )
